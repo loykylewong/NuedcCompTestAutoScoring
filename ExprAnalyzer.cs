@@ -54,8 +54,8 @@ namespace NuedcCompTestAutoScoring
         private Queue<string> varQueue = new Queue<string>();
         private const string varStr = @"[a-zA-Z_]+\w*";
         private const string numStr = @"([\+\-]?\d+\.?\d*|\.\d+)([eE][\+\-]?\d+)?";
-        private const string funStr = @"tanh|tan|sqrt|sinh|sin|sign|round|rem|pow|min|max|log10|log|ln|floor|exp|cosh|cos|ceil|atan2|atan|asin|acos|abs|sat|if";
-        private const string oprStr = @"\(|\)|\+|\-|\*|/|%|&|\||~|\^|\,|(<=)|(>=)|(==)|<|>|" + funStr;
+        private const string funStr = @"trunc|tanh|tan|sqrt|sinh|sin|sign|round|rem|pow|min|max|log10|log|ln|floor|exp|cosh|cos|ceil|atan2|atan|asin|acos|abs|sat|if";
+        private const string oprStr = @"\(|\)|\+|\-|\*|/|%|&&|&|\|\||\||!|~|\^|\,|(<=)|(>=)|(==)|<|>|" + funStr;
         private Regex varRegex = new Regex(varStr);
         private Regex numRegex = new Regex(numStr);
         private Regex oprRegex = new Regex(oprStr);
@@ -143,7 +143,7 @@ namespace NuedcCompTestAutoScoring
                     numBefore = true;
                 }
                 else
-                    throw (new Exception("ExprAnalyse: Invalid Expression"));
+                    throw (new Exception("ExprAnalyzer: Invalid Expression"));
                 idx += M.Length;
             } while (idx < this.express.Length);
             while (this.oprStack.Count > 0)
@@ -157,7 +157,7 @@ namespace NuedcCompTestAutoScoring
                 if (v.Name == name)
                     return v.Value;
             }
-            throw (new Exception("ExprAnalyse: Can't find variable:\"" + name + "\" in variable table."));
+            throw (new Exception("ExprAnalyzer: Can't find variable:\"" + name + "\" in variable table."));
         }
         private void dealOpr(string opr)
         {
@@ -175,7 +175,7 @@ namespace NuedcCompTestAutoScoring
                 }
                 catch (InvalidOperationException)
                 {
-                    throw (new Exception("ExprAnalyse: brackets does not match."));
+                    throw (new Exception("ExprAnalyzer: brackets does not match."));
                 }
             }
             else
@@ -187,33 +187,41 @@ namespace NuedcCompTestAutoScoring
                 this.oprStack.Push(opr);
             }
         }
-        private int oprPriority(string opr)
+        private int oprPriority(string opr) // larger is higher
         {
             switch (opr)
             {
                 case "(":
                 case ")":
                     return 0;
-                case "+":
-                case "-":
-                    return 20;
+                case "~":
+                case "!":
+                    return 90;
                 case "*":
                 case "/":
                 case "%":
-                    return 40;
+                    return 80;
+                case "+":
+                case "-":
+                    return 70;
                 case ">":
                 case ">=":
                 case "<":
                 case "<=":
                 case "==":
-                    return 50;
-                case "&":
-                case "|":
-                case "~":
-                case "^":
                     return 60;
+                case "&":
+                    return 50;
+                case "^":
+                    return 45;
+                case "|":
+                    return 40;
+                case "&&":
+                    return 35;
+                case "||":
+                    return 30;
                 default:
-                    return 80;
+                    return 100;
             }
         }
         private void calculate()
@@ -276,6 +284,23 @@ namespace NuedcCompTestAutoScoring
                             case "^":
                                 Num.Push(unchecked((long)Num.Pop()) ^ unchecked((long)RightParam));
                                 break;
+                            case "!":
+                                Num.Push(RightParam == 0 ? 1.0 : 0.0);
+                                break;
+                            case "&&":
+                                {
+                                    bool bl = Num.Pop() != 0.0;
+                                    bool br = RightParam != 0.0;
+                                    Num.Push((bl && br) ? 1.0 : 0.0);
+                                }
+                                break;
+                            case "||":
+                                {
+                                    bool bl = Num.Pop() != 0.0;
+                                    bool br = RightParam != 0.0;
+                                    Num.Push((bl || br) ? 1.0 : 0.0);
+                                }
+                                break;
                             case "abs":
                                 Num.Push(Math.Abs(RightParam));
                                 break;
@@ -313,7 +338,7 @@ namespace NuedcCompTestAutoScoring
                                 Num.Push(Math.Log(RightParam));
                                 break;
                             case "log":
-                                Num.Push(Math.Log(Num.Pop()) / Math.Log(RightParam));
+                                Num.Push(Math.Log(Num.Pop(), RightParam));
                                 break;
                             case "log10":
                                 Num.Push(Math.Log10(RightParam));
@@ -348,32 +373,39 @@ namespace NuedcCompTestAutoScoring
                             case "tanh":
                                 Num.Push(Math.Tanh(RightParam));
                                 break;
+                            case "trunc":
+                                Num.Push(Math.Truncate(RightParam));
+                                break;
                             case "sat":
-                                double l = RightParam;
-                                double h = Num.Pop();
-                                double v = Num.Pop();
-                                if (h > l)
-                                    v = v < l ? l : v > h ? h : v;
-                                else if (h < l)
-                                    v = v < h ? h : v > l ? l : v;
-                                else
-                                    v = l;
-                                Num.Push(v);
+                                {
+                                    double l = RightParam;
+                                    double h = Num.Pop();
+                                    double v = Num.Pop();
+                                    if (h > l)
+                                        v = v < l ? l : v > h ? h : v;
+                                    else if (h < l)
+                                        v = v < h ? h : v > l ? l : v;
+                                    else
+                                        v = l;
+                                    Num.Push(v);
+                                }
                                 break;
                             case "if":
-                                double fv = RightParam;
-                                double tv = Num.Pop();
-                                double b = Num.Pop();
-                                if (b == 0)
-                                    Num.Push(fv);
-                                else
-                                    Num.Push(tv);
+                                {
+                                    double fv = RightParam;
+                                    double tv = Num.Pop();
+                                    double b = Num.Pop();
+                                    if (b == 0)
+                                        Num.Push(fv);
+                                    else
+                                        Num.Push(tv);
+                                }
                                 break;
                         }
                     }
                     catch (InvalidOperationException)
                     {
-                        throw (new Exception("ExprAnalyse: Invalid Expression."));
+                        throw (new Exception("ExprAnalyzer: Invalid Expression."));
                     }
                 }
                 else
@@ -381,7 +413,7 @@ namespace NuedcCompTestAutoScoring
             }
             this.value = Num.Pop();
             if (Num.Count != 0)
-                throw (new Exception("ExprAnalyse: Invalid Expression"));
+                throw (new Exception("ExprAnalyzer: Invalid Expression"));
         }
         public void SetVariableTable(string variableTable)
         {
@@ -403,7 +435,6 @@ namespace NuedcCompTestAutoScoring
             }
             this.analysed = false;
         }
-
         public bool ChangeVarible(string name, double value)
         {
             for (int i = 0; i < this.varTable.Length; i++)
