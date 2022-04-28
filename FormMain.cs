@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Collections.Generic;
+using ExpressionAnalyzer;
 
 namespace NuedcCompTestAutoScoring
 {
@@ -267,7 +268,7 @@ namespace NuedcCompTestAutoScoring
                         row.Cells[4].Value = gw.Scpi.Command(@"*idn?");
                         gw.Close();
                     }
-                    catch(Exception ex)
+                    catch(Exception)
                     {
                         row.Cells[4].Value = "连接失败";
                     }
@@ -288,7 +289,7 @@ namespace NuedcCompTestAutoScoring
                 row.Cells[4].Value = gw.Scpi.Command(@"*idn?");
                 return gw;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 row.Cells[4].Value = "连接失败";
                 return gw;
@@ -365,8 +366,13 @@ namespace NuedcCompTestAutoScoring
                     row.Cells[7].Value = val.ToEngineerFormatString(6);
                     try
                     {
-                        ExprAnalyzer.Variable vars = new("x", val);
-                        ExprAnalyzer ea = new ExprAnalyzer((string)row.Cells[6].Value, new ExprAnalyzer.Variable[1] { vars });
+                        //======== old ExprAnalyzer >>>>>>>>
+                        //ExprAnalyzer.Variable vars = new("x", val);
+                        //ExprAnalyzer ea = new ExprAnalyzer((string)row.Cells[6].Value, new ExprAnalyzer.Variable[1] { vars });
+                        //==================================
+                        ExprAnalyzer ea = new ExprAnalyzer((string)row.Cells[6].Value);
+                        ea.Variables.Add("x", val);
+                        //<<<<<<<< new ExprAnalyzer ========
                         row.Cells[8].Value = ea.Value.ToString();
                     }
                     catch
@@ -483,27 +489,47 @@ namespace NuedcCompTestAutoScoring
                         {
                             DoMeasureRow(gw, sr);
                         }
-                        ExprAnalyzer.Variable[] vars = new ExprAnalyzer.Variable[dgvScoreDetail.Rows.Count * 2];
+                        //======== use old ExprAnalyzer >>>>>>>>
+                        //ExprAnalyzer.Variable[] vars = new ExprAnalyzer.Variable[dgvScoreDetail.Rows.Count * 2];
+                        //for (int i = 0; i < dgvScoreDetail.Rows.Count; i++)
+                        //{
+                        //    vars[2 * i].Name = "m" + (1 + i).ToString();
+                        //    string valstr = (string)(dgvScoreDetail.Rows[i].Cells[7].Value);
+                        //    if(valstr != null)
+                        //        vars[2 * i].Value = valstr.ToDoubleFromEngineerFormat();
+                        //    else
+                        //        vars[2 * i].Value = double.NaN;
+
+                        //    vars[2 * i + 1].Name = "s" + (1 + i).ToString();
+                        //    valstr = (string)(dgvScoreDetail.Rows[i].Cells[8].Value);
+                        //    if (valstr != null)
+                        //        vars[2 * i + 1].Value = valstr.ToDoubleFromEngineerFormat();
+                        //    else
+                        //        vars[2 * i + 1].Value = 0;
+                        //}
+                        //string str = (string)(er.Cells[5].Value);
+                        //if(str == null)
+                        //    str = "0";
+                        //ExprAnalyzer ea = new ExprAnalyzer(str, vars);
+                        //===================================
+                        ExprAnalyzer ea = new ExprAnalyzer((string)er.Cells[5].Value ?? "");
                         for (int i = 0; i < dgvScoreDetail.Rows.Count; i++)
                         {
-                            vars[2 * i].Name = "m" + (1 + i).ToString();
+                            string name = "m" + (1 + i).ToString();
                             string valstr = (string)(dgvScoreDetail.Rows[i].Cells[7].Value);
-                            if(valstr != null)
-                                vars[2 * i].Value = valstr.ToDoubleFromEngineerFormat();
+                            if (valstr != null)
+                                ea.Variables.Add(name, valstr.ToDoubleFromEngineerFormat());
                             else
-                                vars[2 * i].Value = double.NaN;
+                                ea.Variables.Add(name, double.NaN);
 
-                            vars[2 * i + 1].Name = "s" + (1 + i).ToString();
+                            name = "s" + (1 + i).ToString();
                             valstr = (string)(dgvScoreDetail.Rows[i].Cells[8].Value);
                             if (valstr != null)
-                                vars[2 * i + 1].Value = valstr.ToDoubleFromEngineerFormat();
+                                ea.Variables.Add(name, valstr.ToDoubleFromEngineerFormat());
                             else
-                                vars[2 * i + 1].Value = 0;
+                                ea.Variables.Add(name, 0);
                         }
-                        string str = (string)(er.Cells[5].Value);
-                        if(str == null)
-                            str = "0";
-                        ExprAnalyzer ea = new ExprAnalyzer(str, vars);
+                        //<<<<<<<< use new ExprAnalyzer ========
                         er.Cells[6].Value = ea.Value.ToString();
                         gw.Close();
                     }
@@ -531,7 +557,7 @@ namespace NuedcCompTestAutoScoring
                 {
                     fs = new FileStream(sfd.FileName, FileMode.Create);
                 }
-                catch(Exception ex)
+                catch(Exception)
                 {
                     MessageBox.Show("无法创建文件，如果将被覆盖的文件已被其它应用打开，关闭后重试。", "无法创建文件", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
@@ -660,7 +686,7 @@ namespace NuedcCompTestAutoScoring
                 {
                     fs = new FileStream(sfd.FileName, FileMode.Create);
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     MessageBox.Show("无法创建文件，如果将被覆盖的文件已被其它应用打开，关闭后重试。", "无法创建文件", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;

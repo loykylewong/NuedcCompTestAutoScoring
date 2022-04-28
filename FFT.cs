@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Numerics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace NuedcCompTestAutoScoring
 {
@@ -47,22 +48,15 @@ namespace NuedcCompTestAutoScoring
         }
         public FFT(int m, Windows wind, double beta = 1.0)
         {
-            Reset(m, wind, beta);
+            reset(m, wind, beta);
         }
         public void Reset(int m, Windows windType, double beta = 1.0)
         {
-            if (m == this.m && windType == this.windType)
-            {
-                if (windType == Windows.Kaiser)
-                {
-                    if (beta == this.beta)
-                    {
-                        return;
-                    }
-                }
-                else
-                    return;
-            }
+            if (m != this.m || windType != this.windType || (windType == Windows.Kaiser && beta != this.beta))
+                this.reset(m, windType, beta);
+        }
+        [MemberNotNull(nameof(w), nameof(wind))] private void reset(int m, Windows windType, double beta = 1.0)
+        {
             this.m = m;
             this.len = 1 << m;
             this.windType = windType;
